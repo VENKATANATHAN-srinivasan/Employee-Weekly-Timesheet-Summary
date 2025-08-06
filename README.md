@@ -16,15 +16,6 @@ This is a **web-based tool** built using **Flask (Python)** and **JavaScript** t
 
 ---
 
-## 🚀 Getting Started
-
-### 1. Clone the Repo
-
-```bash
-git clone https://github.com/your-username/timesheet-summary-tool.git
-cd timesheet-summary-tool
-```
-
 
 ## 📤 Sample Excel Format
 
