@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Weekly Timesheet Summary Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #022d53 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            background: #f8f9fc;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 2px dashed #d1d9e6;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #4facfe;
+            background: #f0f7ff;
+        }
+
+        .upload-section.dragover {
+            border-color: #4facfe;
+            background: #e6f3ff;
+            transform: scale(1.02);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: 20px 0;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-button {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.3);
+        }
+
+        .file-input-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4);
+        }
+
+        .file-info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e8f5e8;
+            border-radius: 8px;
+            color: #2d5a2d;
+            display: none;
+        }
+
+        .config-section {
+            background: #fff;
+            border: 1px solid #e1e8ed;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .config-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #34495e;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #4facfe;
+            box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
+        }
+
+        .process-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 30px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .process-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .process-button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .results {
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9fc;
+            border-radius: 12px;
+            border-left: 4px solid #4facfe;
+        }
+
+        .employee-summary {
+            background: white;
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .employee-summary h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            background: #f8f9fc;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #4facfe;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .task-mismatches {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .task-mismatches h5 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .mismatch-item {
+            background: #fff;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            border-left: 3px solid #f39c12;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4facfe;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffe6e6;
+            color: #d63031;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #d63031;
+        }
+
+        .success {
+            background: #e6ffe6;
+            color: #00b894;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid #00b894;
+        }
+
+        .backend-config {
+            background: #f8f4e6;
+            border: 1px solid #f39c12;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .backend-config h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .summary-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> Employee Timesheet Analyzer</h1>
+            
+        </div>
+        
+        <div class="main-content">
+            <div class="upload-section" id="uploadSection">
+                <h3>📁 Upload Weekly Timesheet</h3>
+                <p>Drag and drop your Excel file here or click to browse</p>
+                <div class="file-input-wrapper">
+                    <input type="file" class="file-input" id="fileInput" accept=".xlsx,.xls">
+                    <button class="file-input-button">Choose Excel File</button>
+                </div>
+                <div class="file-info" id="fileInfo"></div>
+                <!-- <p style="margin-top: 15px; color: #7f8c8d; font-size: 0.9em;">
+                    ⚡ The system will auto-detect column variations like: "Employee_Name", "employee name", "Planned_Task", "planned task", etc.
+                </p> -->
+            </div>
+
+            <!-- <div class="config-section">
+                <h3>⚙️ Backend Configuration</h3>
+                <div class="backend-config">
+                    <h4>📡 Flask Backend Settings</h4>
+                    <p>Make sure your Flask app is running on the configured URL below.</p>
+                </div>
+                <div class="form-group">
+                    <label for="backendUrl">Backend URL:</label>
+                    <input type="url" id="backendUrl" placeholder="http://localhost:5000" value="http://localhost:5000">
+                </div>
+            </div> -->
+
+            <div class="config-section">
+                <h3>📧 Email Configuration</h3>
+                <div class="form-group">
+                    <label for="emailMode">Email Mode:</label>
+                    <select id="emailMode">
+                        <option value="console">Console Output (Demo)</option>
+                        <!-- <option value="backend">Send via Backend (Flask + SMTP)</option> -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="senderEmail">Sender Email (for display only):</label>
+                    <input type="email" id="senderEmail" placeholder="hr@company.com" value="hr@company.com">
+                </div>
+                <div class="form-group">
+                    <label for="emailSubject">Email Subject:</label>
+                    <input type="text" id="emailSubject" placeholder="Weekly Timesheet Summary" value="Weekly Timesheet Summary">
+                </div>
+            </div>
+
+            <button class="process-button" id="processButton" disabled>
+                🚀 Process Timesheet 
+            </button>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Processing timesheet and preparing summaries...</p>
+            </div>
+
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let uploadedData = null;
+        let uploadedFile = null;
+
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInfo = document.getElementById('fileInfo');
+        const processButton = document.getElementById('processButton');
+        const results = document.getElementById('results');
+        const loading = document.getElementById('loading');
+
+        // Drag and drop functionality
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                showError('Please select a valid Excel file (.xlsx or .xls)');
+                return;
+            }
+
+            uploadedFile = file;
+
+            fileInfo.innerHTML = `
+                <strong>📄 ${file.name}</strong><br>
+                Size: ${(file.size / 1024).toFixed(1)} KB<br>
+                Last modified: ${new Date(file.lastModified).toLocaleString()}
+            `;
+            fileInfo.style.display = 'block';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    console.log('File size:', e.target.result.length);
+                    console.log('File type detected:', typeof e.target.result);
+                    
+                    const workbook = XLSX.read(e.target.result, { type: 'binary' });
+                    console.log('Workbook loaded, sheets:', workbook.SheetNames);
+                    
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    console.log('First sheet loaded');
+                    
+                    // Try different header row options
+                    let jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    let fileColumns = Object.keys(jsonData[0] || {});
+                    console.log('First attempt - Available columns:', fileColumns);
+                    console.log('First attempt - Row count:', jsonData.length);
+                    
+                    // If we get empty columns or title-like columns, try starting from row 2
+                    if (fileColumns.length === 0 || fileColumns.some(col => col.includes('__EMPTY') || col.includes('Sample Excel') || col.includes('Timesheet'))) {
+                        console.log('Detected header in wrong row, trying row 2...');
+                        jsonData = XLSX.utils.sheet_to_json(firstSheet, { range: 1 }); // Start from row 2 (index 1)
+                        fileColumns = Object.keys(jsonData[0] || {});
+                        console.log('Second attempt - Available columns:', fileColumns);
+                        console.log('Second attempt - Row count:', jsonData.length);
+                    }
+                    
+                    // If still empty columns, try row 3
+                    if (fileColumns.length === 0 || fileColumns.some(col => col.includes('__EMPTY'))) {
+                        console.log('Still finding empty columns, trying row 3...');
+                        jsonData = XLSX.utils.sheet_to_json(firstSheet, { range: 2 }); // Start from row 3 (index 2)
+                        fileColumns = Object.keys(jsonData[0] || {});
+                        console.log('Third attempt - Available columns:', fileColumns);
+                        console.log('Third attempt - Row count:', jsonData.length);
+                    }
+                    
+                    // Check if we have any data
+                    if (!jsonData || jsonData.length === 0) {
+                        throw new Error('No data found in Excel file. Please check if the file contains data.');
+                    }
+                    
+                    // Check if we have valid columns
+                    if (!fileColumns || fileColumns.length === 0) {
+                        throw new Error('No column headers found. Please ensure your Excel file has proper column headers.');
+                    }
+                    
+                    // Validate required columns with flexible matching
+                    console.log('Final columns to process:', fileColumns);
+                    
+                    const columnMap = {
+                        employeeName: null,
+                        // employeeEmail: null,
+                        date: null,
+                        plannedTask: null,
+                        plannedHours: null,
+                        actualTask: null,
+                        actualHours: null
+                    };
+                    
+                    // Flexible column matching
+                    fileColumns.forEach(col => {
+                        const normalizedCol = col.toLowerCase().trim().replace(/[_\s-]+/g, '');
+                        console.log(`Checking column: "${col}" -> normalized: "${normalizedCol}"`);
+                        
+                        if (normalizedCol.includes('employeename') || (normalizedCol.includes('employee') && normalizedCol.includes('name'))) {
+                            columnMap.employeeName = col;
+                            console.log('✓ Found Employee Name:', col);
+                        } else if (normalizedCol.includes('employeeemail') || (normalizedCol.includes('employee') && normalizedCol.includes('email')) || normalizedCol === 'email') {
+                            columnMap.employeeEmail = col;
+                            console.log('✓ Found Employee Email:', col);
+                        } else if (normalizedCol === 'date' || normalizedCol.includes('date')) {
+                            columnMap.date = col;
+                            console.log('✓ Found Date:', col);
+                        } else if (normalizedCol.includes('plannedtask') || (normalizedCol.includes('planned') && normalizedCol.includes('task'))) {
+                            columnMap.plannedTask = col;
+                            console.log('✓ Found Planned Task:', col);
+                        } else if (normalizedCol.includes('plannedhours') || (normalizedCol.includes('planned') && normalizedCol.includes('hour'))) {
+                            columnMap.plannedHours = col;
+                            console.log('✓ Found Planned Hours:', col);
+                        } else if (normalizedCol.includes('actualtask') || (normalizedCol.includes('actual') && normalizedCol.includes('task'))) {
+                            columnMap.actualTask = col;
+                            console.log('✓ Found Actual Task:', col);
+                        } else if (normalizedCol.includes('actualhours') || (normalizedCol.includes('actual') && normalizedCol.includes('hour'))) {
+                            columnMap.actualHours = col;
+                            console.log('✓ Found Actual Hours:', col);
+                        }
+                    });
+                    
+                    const missingColumns = Object.keys(columnMap).filter(key => !columnMap[key]);
+                    
+                    if (missingColumns.length > 0) {
+                        const friendlyNames = {
+                            employeeName: 'Employee Name',
+                            employeeEmail: 'Employee Email',
+                            date: 'Date',
+                            plannedTask: 'Planned Task',
+                            plannedHours: 'Planned Hours',
+                            actualTask: 'Actual Task',
+                            actualHours: 'Actual Hours'
+                        };
+                        
+                        const missingFriendlyNames = missingColumns.map(key => friendlyNames[key]);
+                        showError(`Missing or unrecognized columns: ${missingFriendlyNames.join(', ')}<br><br>Available columns: ${fileColumns.join(', ')}<br><br>Please ensure your Excel file has columns that match these patterns.`);
+                        return;
+                    }
+                    
+                    // Store column mapping for later use
+                    uploadedData = jsonData;
+                    uploadedData.columnMap = columnMap;
+                    
+                    uploadedData = jsonData;
+                    processButton.disabled = false;
+                    showSuccess(`✅ File loaded successfully! Found ${jsonData.length} timesheet entries with email addresses.`);
+                } catch (error) {
+                    showError('Error reading Excel file. Please check the file format.');
+                    console.error('Excel parsing error:', error);
+                }
+            };
+            reader.readAsBinaryString(file);
+        }
+
+        // Process timesheet data
+        processButton.addEventListener('click', async () => {
+            if (!uploadedData) {
+                showError('Please upload a timesheet file first.');
+                return;
+            }
+
+            loading.style.display = 'block';
+            results.innerHTML = '';
+
+            const emailMode = document.getElementById('emailMode').value;
+
+            try {
+                if (emailMode === 'backend') {
+                    if (!uploadedFile) {
+                        showError('Backend mode requires file upload. Please upload an Excel file.');
+                        return;
+                    }
+                    // Send to Flask backend
+                    await sendToBackend();
+                } else {
+                    // Process locally and show in console - ALWAYS use uploadedData (from Excel)
+                    const processedData = processTimesheetData(uploadedData);
+                    displayResults(processedData);
+                    sendEmailNotifications(processedData);
+                }
+            } catch (error) {
+                showError('Error processing timesheet data: ' + error.message);
+                console.error('Processing error:', error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+
+        async function sendToBackend() {
+            const backendUrl = document.getElementById('backendUrl').value;
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
+
+            try {
+                const response = await fetch(`${backendUrl}/send-emails`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showSuccess(`📧 ${result.message}`);
+                    
+                    // Also process and display results locally
+                    const processedData = processTimesheetData(uploadedData);
+                    displayResults(processedData);
+                } else {
+                    showError(`Backend error: ${result.error}`);
+                }
+            } catch (error) {
+                showError(`Failed to connect to backend: ${error.message}`);
+                console.error('Backend connection error:', error);
+            }
+        }
+
+        function processTimesheetData(data) {
+            const employeeMap = {};
+            const columnMap = data.columnMap || {};
+            
+            // Group data by employee
+            data.forEach(row => {
+                // Use flexible column mapping
+                const employeeName = row[columnMap.employeeName] || row['Employee Name'];
+                let employeeEmail = row[columnMap.employeeEmail] || row['Employee Email'];
+                if (!employeeEmail && employeeName) {
+    const cleanName = employeeName.toLowerCase().replace(/\s+/g, '');
+    employeeEmail = `${cleanName}.company@gmail.com`;
+}
+const emailGenerated = !row[columnMap.employeeEmail] && !row['Employee Email'];
+
+                const date = row[columnMap.date] || row['Date'];
+                const plannedTask = row[columnMap.plannedTask] || row['Planned Task'] || '';
+                const plannedHours = parseFloat(row[columnMap.plannedHours] || row['Planned Hours'] || 0);
+                const actualTask = row[columnMap.actualTask] || row['Actual Task'] || '';
+                const actualHours = parseFloat(row[columnMap.actualHours] || row['Actual Hours'] || 0);
+
+                if (!employeeName || !employeeEmail) return;
+
+                if (!employeeMap[employeeName]) {
+                    employeeMap[employeeName] = {
+                        name: employeeName,
+                        email: employeeEmail,
+                        emailGenerated: emailGenerated,
+                        entries: [],
+                        totalPlannedHours: 0,
+                        totalActualHours: 0,
+                        taskMismatches: []
+                    };
+                }
+
+                const employee = employeeMap[employeeName];
+                employee.entries.push({
+                    date,
+                    plannedTask,
+                    plannedHours,
+                    actualTask,
+                    actualHours
+                });
+
+                employee.totalPlannedHours += plannedHours;
+                employee.totalActualHours += actualHours;
+
+                // Check for task mismatches
+                if (plannedTask.toLowerCase().trim() !== actualTask.toLowerCase().trim() && 
+                    plannedTask.trim() !== '' && actualTask.trim() !== '') {
+                    employee.taskMismatches.push({
+                        date,
+                        planned: plannedTask,
+                        actual: actualTask,
+                        plannedHours,
+                        actualHours
+                    });
+                }
+            });
+
+            // Calculate completion rates and other metrics
+            Object.values(employeeMap).forEach(employee => {
+                employee.completionRate = employee.totalPlannedHours > 0 
+                    ? ((employee.totalActualHours / employee.totalPlannedHours) * 100).toFixed(1)
+                    : 0;
+                    
+                employee.hoursDifference = employee.totalActualHours - employee.totalPlannedHours;
+                employee.weekDates = [...new Set(employee.entries.map(e => e.date))].sort();
+            });
+
+            return Object.values(employeeMap);
+        }
+
+        function displayResults(employeeData) {
+            let resultsHTML = '<h3>📊 Timesheet Analysis Results</h3>';
+            
+            employeeData.forEach(employee => {
+                const completionColor = employee.completionRate >= 90 ? '#00b894' : 
+                                       employee.completionRate >= 70 ? '#f39c12' : '#d63031';
+                
+                resultsHTML += `
+                    <div class="employee-summary">
+                        <h4>👤 ${employee.name}</h4>
+                        <p><strong>Email:</strong> ${employee.email} ${employee.emailGenerated ? '<span style="color:red;">(auto-generated)</span>' : ''}</p>
+
+                        <div class="summary-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">${employee.totalPlannedHours}h</div>
+                                <div class="stat-label">Planned Hours</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${employee.totalActualHours}h</div>
+                                <div class="stat-label">Actual Hours</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: ${completionColor}">${employee.completionRate}%</div>
+                                <div class="stat-label">Completion Rate</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: ${employee.hoursDifference >= 0 ? '#00b894' : '#d63031'}">
+                                    ${employee.hoursDifference > 0 ? '+' : ''}${employee.hoursDifference}h
+                                </div>
+                                <div class="stat-label">Hours Difference</div>
+                            </div>
+                        </div>
+                        
+                        <p><strong>📅 Week Period:</strong> ${employee.weekDates[0]} to ${employee.weekDates[employee.weekDates.length - 1]}</p>
+                        <p><strong>📋 Total Entries:</strong> ${employee.entries.length}</p>
+                        
+                        ${employee.taskMismatches.length > 0 ? `
+                            <div class="task-mismatches">
+                                <h5>⚠️ Task Mismatches (${employee.taskMismatches.length})</h5>
+                                ${employee.taskMismatches.map(mismatch => `
+                                    <div class="mismatch-item">
+                                        <strong>${mismatch.date}:</strong><br>
+                                        Planned: "${mismatch.planned}" (${mismatch.plannedHours}h)<br>
+                                        Actual: "${mismatch.actual}" (${mismatch.actualHours}h)
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : '<p style="color: #00b894;">✅ All tasks completed as planned!</p>'}
+                    </div>
+                `;
+            });
+            
+            results.innerHTML = resultsHTML;
+        }
+
+        function sendEmailNotifications(employeeData) {
+            const senderEmail = document.getElementById('senderEmail').value;
+            const subjectTemplate = document.getElementById('emailSubject').value;
+            
+            employeeData.forEach(employee => {
+                const emailContent = generateEmailContent(employee);
+                const subject = subjectTemplate.replace('{date}', new Date().toISOString().split('T')[0]);
+                
+                console.log(`
+=== EMAIL NOTIFICATION ===
+To: ${employee.email}
+From: ${senderEmail}
+Subject: ${subject}
+
+${emailContent}
+========================
+                `);
+            });
+            
+            showSuccess(`📧 Email notifications logged to console for ${employeeData.length} employee(s). Check browser console for demo output.`);
+        }
+
+        function generateEmailContent(employee) {
+            const completionStatus = employee.completionRate >= 90 ? 'Excellent' :
+                                   employee.completionRate >= 70 ? 'Good' : 'Needs Improvement';
+            
+            return `
+Dear ${employee.name},
+
+Here's your weekly timesheet summary:
+
+📊 SUMMARY:
+- Planned Hours: ${employee.totalPlannedHours}
+- Actual Hours: ${employee.totalActualHours}
+- Completion Rate: ${employee.completionRate}% (${completionStatus})
+- Hours Difference: ${employee.hoursDifference > 0 ? '+' : ''}${employee.hoursDifference}
+
+📅 Week Period: ${employee.weekDates[0]} to ${employee.weekDates[employee.weekDates.length - 1]}
+
+${employee.taskMismatches.length > 0 ? `
+⚠️ TASK MISMATCHES (${employee.taskMismatches.length}):
+${employee.taskMismatches.map(m => 
+`- ${m.date}: Planned "${m.planned}" → Actual "${m.actual}"`
+).join('\n')}
+
+Please review these mismatches and ensure accurate task logging in future timesheets.
+` : '✅ All tasks were completed as planned. Great work!'}
+
+If you have any questions about this summary, please contact HR.
+
+Best regards,
+HR Team
+            `.trim();
+        }
+
+        function showError(message) {
+            results.innerHTML = `<div class="error">❌ ${message}</div>`;
+        }
+
+        function showSuccess(message) {
+            if (results.innerHTML === '') {
+                results.innerHTML = `<div class="success">${message}</div>`;
+            } else {
+                results.innerHTML += `<div class="success">${message}</div>`;
+            }
+        }
+
+        
+
+        // Add buttons for testing
+        setTimeout(() => {
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'margin-top: 15px; text-align: center;';
+            
+            const yourDataButton = document.createElement('button');
+            yourDataButton.textContent = '📊 Load Your Excel Data';
+            yourDataButton.style.cssText = `
+                background: #e74c3c;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 20px;
+                cursor: pointer;
+                margin: 5px;
+                font-size: 0.9em;
+                font-weight: 600;
+            `;
+            yourDataButton.onclick = loadYourExcelData;
+            
+            const sampleButton = document.createElement('button');
+            sampleButton.textContent = '🎯 Load Sample Data (Demo)';
+            sampleButton.style.cssText = `
+                background: #00b894;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 20px;
+                cursor: pointer;
+                margin: 5px;
+                font-size: 0.9em;
+            `;
+            sampleButton.onclick = generateSampleData;
+            
+            buttonContainer.appendChild(yourDataButton);
+            buttonContainer.appendChild(sampleButton);
+            uploadSection.appendChild(buttonContainer);
+        }, 1000);
+    </script>
+</body>
+</html>
