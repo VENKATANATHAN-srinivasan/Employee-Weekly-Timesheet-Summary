@@ -301,6 +301,14 @@
             margin-bottom: 10px;
         }
 
+        .backend-fields {
+            display: none;
+        }
+
+        .backend-fields.show {
+            display: block;
+        }
+
         @media (max-width: 768px) {
             .container {
                 margin: 10px;
@@ -327,8 +335,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1> Employee Timesheet Analyzer</h1>
-            
+            <h1>📊 Employee Timesheet Analyzer</h1>
+            <p>Upload, analyze, and send automated weekly timesheet summaries</p>
         </div>
         
         <div class="main-content">
@@ -340,22 +348,10 @@
                     <button class="file-input-button">Choose Excel File</button>
                 </div>
                 <div class="file-info" id="fileInfo"></div>
-                <!-- <p style="margin-top: 15px; color: #7f8c8d; font-size: 0.9em;">
+                <p style="margin-top: 15px; color: #7f8c8d; font-size: 0.9em;">
                     ⚡ The system will auto-detect column variations like: "Employee_Name", "employee name", "Planned_Task", "planned task", etc.
-                </p> -->
+                </p>
             </div>
-
-            <!-- <div class="config-section">
-                <h3>⚙️ Backend Configuration</h3>
-                <div class="backend-config">
-                    <h4>📡 Flask Backend Settings</h4>
-                    <p>Make sure your Flask app is running on the configured URL below.</p>
-                </div>
-                <div class="form-group">
-                    <label for="backendUrl">Backend URL:</label>
-                    <input type="url" id="backendUrl" placeholder="http://localhost:5000" value="http://localhost:5000">
-                </div>
-            </div> -->
 
             <div class="config-section">
                 <h3>📧 Email Configuration</h3>
@@ -363,9 +359,21 @@
                     <label for="emailMode">Email Mode:</label>
                     <select id="emailMode">
                         <option value="console">Console Output (Demo)</option>
-                        <!-- <option value="backend">Send via Backend (Flask + SMTP)</option> -->
+                        <option value="backend">Send via Backend (Flask + SMTP)</option> 
                     </select>
                 </div>
+                
+                <div class="backend-fields" id="backendFields">
+                    <div class="backend-config">
+                        <h4>📡 Flask Backend Settings</h4>
+                        <p>Make sure your Flask app is running on the configured URL below.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="backendUrl">Backend URL:</label>
+                        <input type="url" id="backendUrl" placeholder="http://localhost:5000" value="http://localhost:5000">
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label for="senderEmail">Sender Email (for display only):</label>
                     <input type="email" id="senderEmail" placeholder="hr@company.com" value="hr@company.com">
@@ -377,7 +385,7 @@
             </div>
 
             <button class="process-button" id="processButton" disabled>
-                🚀 Process Timesheet 
+                🚀 Process Timesheet & Send Summaries
             </button>
 
             <div class="loading" id="loading">
@@ -400,6 +408,17 @@
         const processButton = document.getElementById('processButton');
         const results = document.getElementById('results');
         const loading = document.getElementById('loading');
+        const emailMode = document.getElementById('emailMode');
+        const backendFields = document.getElementById('backendFields');
+
+        // Show/hide backend fields based on email mode
+        emailMode.addEventListener('change', () => {
+            if (emailMode.value === 'backend') {
+                backendFields.classList.add('show');
+            } else {
+                backendFields.classList.remove('show');
+            }
+        });
 
         // Drag and drop functionality
         uploadSection.addEventListener('dragover', (e) => {
@@ -492,7 +511,7 @@
                     
                     const columnMap = {
                         employeeName: null,
-                        // employeeEmail: null,
+                        employeeEmail: null,
                         date: null,
                         plannedTask: null,
                         plannedHours: null,
@@ -529,7 +548,9 @@
                         }
                     });
                     
-                    const missingColumns = Object.keys(columnMap).filter(key => !columnMap[key]);
+                    // Employee email is optional - don't require it
+                    const requiredFields = ['employeeName', 'date', 'plannedTask', 'plannedHours', 'actualTask', 'actualHours'];
+                    const missingColumns = requiredFields.filter(key => !columnMap[key]);
                     
                     if (missingColumns.length > 0) {
                         const friendlyNames = {
@@ -551,9 +572,10 @@
                     uploadedData = jsonData;
                     uploadedData.columnMap = columnMap;
                     
-                    uploadedData = jsonData;
                     processButton.disabled = false;
-                    showSuccess(`✅ File loaded successfully! Found ${jsonData.length} timesheet entries with email addresses.`);
+                    
+                    const emailStatus = columnMap.employeeEmail ? 'with email addresses' : 'without email addresses (will be auto-generated)';
+                    showSuccess(`✅ File loaded successfully! Found ${jsonData.length} timesheet entries ${emailStatus}.`);
                 } catch (error) {
                     showError('Error reading Excel file. Please check the file format.');
                     console.error('Excel parsing error:', error);
@@ -572,10 +594,10 @@
             loading.style.display = 'block';
             results.innerHTML = '';
 
-            const emailMode = document.getElementById('emailMode').value;
+            const currentEmailMode = emailMode.value;
 
             try {
-                if (emailMode === 'backend') {
+                if (currentEmailMode === 'backend') {
                     if (!uploadedFile) {
                         showError('Backend mode requires file upload. Please upload an Excel file.');
                         return;
@@ -583,7 +605,7 @@
                     // Send to Flask backend
                     await sendToBackend();
                 } else {
-                    // Process locally and show in console - ALWAYS use uploadedData (from Excel)
+                    // Process locally and show in console
                     const processedData = processTimesheetData(uploadedData);
                     displayResults(processedData);
                     sendEmailNotifications(processedData);
@@ -597,31 +619,101 @@
         });
 
         async function sendToBackend() {
-            const backendUrl = document.getElementById('backendUrl').value;
+            const backendUrl = document.getElementById('backendUrl').value || 'http://localhost:5000';
             const formData = new FormData();
             formData.append('file', uploadedFile);
 
             try {
+                console.log(`Sending request to: ${backendUrl}/send-emails`);
+                
                 const response = await fetch(`${backendUrl}/send-emails`, {
                     method: 'POST',
                     body: formData
                 });
 
+                console.log('Response status:', response.status);
                 const result = await response.json();
+                console.log('Response data:', result);
 
                 if (response.ok) {
-                    showSuccess(`📧 ${result.message}`);
-                    
-                    // Also process and display results locally
-                    const processedData = processTimesheetData(uploadedData);
-                    displayResults(processedData);
+                    // Display backend results
+                    displayBackendResults(result.summaries);
+                    showSuccess(`📧 Backend processing completed! Found ${result.summaries.length} employee summaries.`);
                 } else {
                     showError(`Backend error: ${result.error}`);
+                    if (result.available_columns) {
+                        showError(`Available columns in your file: ${result.available_columns.join(', ')}`);
+                    }
                 }
             } catch (error) {
-                showError(`Failed to connect to backend: ${error.message}`);
+                showError(`Failed to connect to backend at ${backendUrl}: ${error.message}<br><br>Make sure your Flask app is running and accessible.`);
                 console.error('Backend connection error:', error);
             }
+        }
+
+        function displayBackendResults(backendSummaries) {
+            let resultsHTML = '<h3>📊 Backend Processing Results</h3>';
+            
+            backendSummaries.forEach(summary => {
+                const completionRate = summary.planned_total_hours > 0 
+                    ? ((summary.actual_total_hours / summary.planned_total_hours) * 100).toFixed(1)
+                    : 0;
+                    
+                const hoursDifference = summary.actual_total_hours - summary.planned_total_hours;
+                const completionColor = completionRate >= 90 ? '#00b894' : 
+                                       completionRate >= 70 ? '#f39c12' : '#d63031';
+
+                // Find task mismatches
+                const taskMismatches = summary.details.filter(detail => 
+                    detail.planned_task.toLowerCase().trim() !== detail.actual_task.toLowerCase().trim() && 
+                    detail.planned_task.trim() !== '' && detail.actual_task.trim() !== ''
+                );
+                
+                resultsHTML += `
+                    <div class="employee-summary">
+                        <h4>👤 ${summary.employee}</h4>
+                        <p><strong>Email:</strong> ${summary.email} ${summary.email_generated ? '<span style="color:red;">(auto-generated)</span>' : ''}</p>
+
+                        <div class="summary-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">${summary.planned_total_hours}h</div>
+                                <div class="stat-label">Planned Hours</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${summary.actual_total_hours}h</div>
+                                <div class="stat-label">Actual Hours</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: ${completionColor}">${completionRate}%</div>
+                                <div class="stat-label">Completion Rate</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: ${hoursDifference >= 0 ? '#00b894' : '#d63031'}">
+                                    ${hoursDifference > 0 ? '+' : ''}${hoursDifference}h
+                                </div>
+                                <div class="stat-label">Hours Difference</div>
+                            </div>
+                        </div>
+                        
+                        <p><strong>📋 Total Entries:</strong> ${summary.details.length}</p>
+                        
+                        ${taskMismatches.length > 0 ? `
+                            <div class="task-mismatches">
+                                <h5>⚠️ Task Mismatches (${taskMismatches.length})</h5>
+                                ${taskMismatches.map(mismatch => `
+                                    <div class="mismatch-item">
+                                        <strong>${mismatch.date}:</strong><br>
+                                        Planned: "${mismatch.planned_task}" (${mismatch.planned_hours}h)<br>
+                                        Actual: "${mismatch.actual_task}" (${mismatch.actual_hours}h)
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : '<p style="color: #00b894;">✅ All tasks completed as planned!</p>'}
+                    </div>
+                `;
+            });
+            
+            results.innerHTML = resultsHTML;
         }
 
         function processTimesheetData(data) {
@@ -633,11 +725,13 @@
                 // Use flexible column mapping
                 const employeeName = row[columnMap.employeeName] || row['Employee Name'];
                 let employeeEmail = row[columnMap.employeeEmail] || row['Employee Email'];
+                
+                // Generate email if missing
                 if (!employeeEmail && employeeName) {
-    const cleanName = employeeName.toLowerCase().replace(/\s+/g, '');
-    employeeEmail = `${cleanName}.company@gmail.com`;
-}
-const emailGenerated = !row[columnMap.employeeEmail] && !row['Employee Email'];
+                    const cleanName = employeeName.toLowerCase().replace(/\s+/g, '');
+                    employeeEmail = `${cleanName}.company@gmail.com`;
+                }
+                const emailGenerated = !row[columnMap.employeeEmail] && !row['Employee Email'];
 
                 const date = row[columnMap.date] || row['Date'];
                 const plannedTask = row[columnMap.plannedTask] || row['Planned Task'] || '';
@@ -812,16 +906,40 @@ HR Team
         }
 
         function showSuccess(message) {
-            if (results.innerHTML === '') {
+            if (results.innerHTML === '' || results.innerHTML.includes('error')) {
                 results.innerHTML = `<div class="success">${message}</div>`;
             } else {
                 results.innerHTML += `<div class="success">${message}</div>`;
             }
         }
 
-        
+        // Sample data for demo
+        function generateSampleData() {
+            const sampleData = [
+                { 'Employee Name': 'John Doe', 'Date': '2024-01-01', 'Planned Task': 'Project A Development', 'Planned Hours': 8, 'Actual Task': 'Project A Development', 'Actual Hours': 7.5 },
+                { 'Employee Name': 'John Doe', 'Date': '2024-01-02', 'Planned Task': 'Code Review', 'Planned Hours': 6, 'Actual Task': 'Code Review', 'Actual Hours': 6 },
+                { 'Employee Name': 'Jane Smith', 'Date': '2024-01-01', 'Planned Task': 'UI Design', 'Planned Hours': 8, 'Actual Task': 'Bug Fixing', 'Actual Hours': 8 },
+                { 'Employee Name': 'Jane Smith', 'Date': '2024-01-02', 'Planned Task': 'Testing', 'Planned Hours': 7, 'Actual Task': 'Testing', 'Actual Hours': 8 }
+            ];
 
-        // Add buttons for testing
+            uploadedData = sampleData;
+            processButton.disabled = false;
+            
+            fileInfo.innerHTML = `
+                <strong>📄 Sample Data Loaded</strong><br>
+                Records: ${sampleData.length}<br>
+                Employees: John Doe, Jane Smith
+            `;
+            fileInfo.style.display = 'block';
+            
+            showSuccess('✅ Sample data loaded successfully! You can now process the timesheet.');
+        }
+
+        function loadYourExcelData() {
+            fileInput.click();
+        }
+
+        // Add demo buttons
         setTimeout(() => {
             const buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = 'margin-top: 15px; text-align: center;';
